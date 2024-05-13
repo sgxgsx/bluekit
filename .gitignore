@@ -1,0 +1,9 @@
+__pycache__
+application.log
+**/.vagrant/
+vagrant/.vagrant
+vagrant/.vagrant**
+vagrant/.vagrant/**
+vagrant/.vagrant/
+bluekit.egg-info
+build/**
