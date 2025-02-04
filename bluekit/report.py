@@ -1,10 +1,11 @@
 import json
 import logging
 import re
+import shutil
 from tabulate import tabulate
 from colorama import Fore, Back, Style, init
-
 from pathlib import Path
+import os
 
 
 from bluekit.constants import RETURN_CODE_ERROR, RETURN_CODE_NONE_OF_4_STATE_OBSERVED, RETURN_CODE_NOT_VULNERABLE, RETURN_CODE_UNDEFINED, RETURN_CODE_VULNERABLE
@@ -35,8 +36,9 @@ def report_undefined(data):
 
 
 class Report:
-    def __init__(self):
+    def __init__(self, bluekit):
         self.exploitFactory = ExploitFactory(TOOLKIT_BLUEEXPLOITER_INSTALLATION_DIRECTORY)
+        self.bluekit = bluekit
 
     def save_data(self, exploit_name, target, data, code):
         doc = {
@@ -182,12 +184,39 @@ class Report:
         output_json['parent_company'] = ""
         output_json["year_manufactured"] = 1
         
-        jsonfile = open(MACHINE_READABLE_REPORT_OUTPUT_FILE.format(target=target), 'w')
+        # Save the report in the default location
+        source_file = MACHINE_READABLE_REPORT_OUTPUT_FILE.format(target=target)
+        logging.info(f"Creating report at: {source_file}")
+        jsonfile = open(source_file, 'w')
         json.dump(output_json, jsonfile, indent=6)
         jsonfile.close()
 
+        # Verify the file was created
+        if not os.path.exists(source_file):
+            logging.error(f"Failed to create report at {source_file}")
+            return
+
+        logging.info(f"Report created successfully at {source_file}")
+
+        # Copy the report to current directory with MAC address in filename
+        
+        # Get the original directory from BlueKit instance
+        dest_file = os.path.join(self.bluekit.original_dir, f"{target}_report.json")
+        logging.info(f"Attempting to copy report to: {dest_file}")
+        try:
+            shutil.copy2(source_file, dest_file)
+            # Change ownership to the original user if running with sudo
+            if 'SUDO_USER' in os.environ:
+                import pwd
+                sudo_user = os.environ['SUDO_USER']
+                uid = pwd.getpwnam(sudo_user).pw_uid
+                gid = pwd.getpwnam(sudo_user).pw_gid
+                os.chown(dest_file, uid, gid)
+            logging.info(f"Successfully copied report to {dest_file}")
+            print(f"Report saved to: {dest_file}")
+        except Exception as e:
+            logging.error(f"Error copying report to current directory: {str(e)}")
+
 
 if __name__ == "__main__":
-    pass 
-
-
+    pass

@@ -36,16 +36,33 @@ class Recon():
             f = open(filename, 'w')
             f.write(output)
             f.close()
-        except subprocess.CalledProcessError as e:
-            print("Error during running command")
-            print(e.output)
-        return False
+            return True
+        except subprocess.CalledProcessError:
+            # Silently fail - errors are handled at the recon level
+            return False
 
     def run_recon(self, target, commands):
-        log_dir = OUTPUT_DIRECTORY.format(target=target, exploit='recon')
-        Path(log_dir).mkdir(exist_ok=True, parents=True)
-        for command, filename in commands:
-            self.run_command(target, command, log_dir + filename)
+        while True:
+            # Check device connectivity first
+            if not check_availability(target) or not check_connectivity(target):
+                input("The target device is not available. Try restoring the connectivity and press enter to try again")
+                continue
+            
+            # If we get here, device is available and pairable
+            log_dir = OUTPUT_DIRECTORY.format(target=target, exploit='recon')
+            Path(log_dir).mkdir(exist_ok=True, parents=True)
+            
+            # Try to run all commands
+            all_commands_successful = True
+            for command, filename in commands:
+                if not self.run_command(target, command, log_dir + filename):
+                    all_commands_successful = False
+                    input("The target device is not available. Try restoring the connectivity and press enter to try again")
+                    break
+            
+            # Only break the retry loop if all commands succeeded
+            if all_commands_successful:
+                break
     
     def determine_bluetooth_version(self, target) -> float:
         file_path = Path(OUTPUT_DIRECTORY.format(target=target, exploit='recon') + BLUING_BR_LMP[1])
@@ -70,8 +87,7 @@ class Recon():
                     except Exception as e:
                         print("Error during retrieving a version")
             else:
-                print("Recon files do not exist, please run recon module first, then exploit module for better results")
-        return None 
+                return None 
 
     def start_hcidump(self):
         logging.info("Starting hcidump -X...")
@@ -152,6 +168,3 @@ if __name__ == '__main__':
             #run_recon(args.target, invaisive_commands)
     else:
         parser.print_help()
-
-
-

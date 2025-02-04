@@ -2,9 +2,11 @@ import subprocess
 import argparse
 import re
 import os
+from pathlib import Path
 
 from bluekit.constants import COMMAND_CONNECT, COMMAND_INFO, REGEX_COMMAND_CONNECT, NUMBER_OF_DOS_TESTS, MAX_NUMBER_OF_DOS_TEST_TO_FAIL
 from bluekit.constants import RETURN_CODE_NOT_VULNERABLE, RETURN_CODE_ERROR, RETURN_CODE_NONE_OF_4_STATE_OBSERVED, RETURN_CODE_UNDEFINED, RETURN_CODE_VULNERABLE
+from bluekit.constants import OUTPUT_DIRECTORY
 
 
 
@@ -47,13 +49,20 @@ def dos_checker(target):
 
 def check_availability(target):
     try:
-        proc_out = subprocess.check_output(COMMAND_INFO.format(target=target), shell=True, stderr=subprocess.STDOUT)
+        proc_out = subprocess.check_output(COMMAND_INFO.format(target=target), shell=True, stderr=subprocess.PIPE)
+        # Write output to hciinfo.log even when device is not available
+        log_dir = OUTPUT_DIRECTORY.format(target=target, exploit='recon')
+        Path(log_dir).mkdir(exist_ok=True, parents=True)
+        with open(log_dir + 'hciinfo.log', 'w') as f:
+            f.write(proc_out.decode())
     except subprocess.CalledProcessError as e:
-        #print("command '{}' return with error (code {}): {}".format(e.cmd, e.returncode, e.output))
         if e.output == b"Can't create connection: Input/output error\nRequesting information ...\n":
             print("Device is down")
-        else:
-            print("command '{}' return with error (code {}): {}".format(e.cmd, e.returncode, e.output))
+        # Write error output to hciinfo.log for report generation
+        log_dir = OUTPUT_DIRECTORY.format(target=target, exploit='recon')
+        Path(log_dir).mkdir(exist_ok=True, parents=True)
+        with open(log_dir + 'hciinfo.log', 'w') as f:
+            f.write(e.output.decode())
         return False
     #print("Availability - True")
     return True
@@ -108,4 +117,3 @@ if __name__ == '__main__':
         
     else:
         parser.print_help()
-

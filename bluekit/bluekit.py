@@ -11,7 +11,7 @@ from tabulate import tabulate
 from colorama import Fore
 
 from bluekit.constants import CURRENT_DIRECTORY, TOOLKIT_BLUEEXPLOITER_INSTALLATION_DIRECTORY, TOOLKIT_INSTALLATION_DIRECTORY
-from bluekit.constants import LOG_FILE
+from bluekit.constants import LOG_FILE, OUTPUT_DIRECTORY, BLUING_BR_LMP
 from bluekit.factories.exploitfactory import ExploitFactory
 from bluekit.factories.hardwarefactory import HardwareFactory
 from bluekit.engine.engine import Engine
@@ -39,7 +39,7 @@ class BlueKit:
         self.checkpoint = Checkpoint()
         self.setupverifier = SetupVerifier()
         self.recon = Recon()
-        self.report = Report()
+        self.report = Report(self)
     
     def bluekit_signal_handler(self, sig, frame):
         print("Ctrl+C detected. Creating a checkpoint and exiting")
@@ -171,7 +171,23 @@ class BlueKit:
         self.test_one_by_one(target, self.parameters, exploit_pool)
     
     def exploit_filter(self, target, exploits) -> list:
+        # Check if recon files exist by attempting to get version
         version = self.recon.determine_bluetooth_version(target)
+        
+        # If version is None, it means recon files don't exist - run recon
+        if version is None:
+            print("Recon data not found. Running recon...")
+            self.recon.run_recon(target, COMMANDS)
+            # Try to get version again after running recon
+            version = self.recon.determine_bluetooth_version(target)
+            # If still None after recon, something went wrong
+            if version is None:
+                print("Failed to get device information. Please ensure the device is available and try again.")
+                return []
+        else:
+            # Get path to recon file for logging
+            recon_file = os.path.join(OUTPUT_DIRECTORY.format(target=target, exploit='recon'), BLUING_BR_LMP[1])
+            print(f"Recon data found - {recon_file}")
 
         logging.info("start_from_cli_all -> available exploit amount - {}".format(len(exploits)))
         logging.info("start_from_cli_all -> exploits to scan amount - {}".format(len(self.exploits_to_scan)))
@@ -222,10 +238,12 @@ class BlueKit:
         self.recon.run_recon(target, COMMANDS)
 
     def generate_report(self, target):
+        # Generate and print the CLI table report only
         table = self.report.generate_report(target=target)
+        print("\nReport for target device:\n")
         print(table)
-    
-    def generate_machine_readble_report(self, target):
+
+    def generate_machine_readable_report(self, target):
         self.report.generate_machine_readable_report(target=target)
 
 
@@ -264,8 +282,12 @@ def main():
     addition_parameters = args.rest     # maybe args.rest[1:] is needed, not sure.
     
 
+    # Store original working directory
+    original_dir = os.getcwd()
     os.chdir(TOOLKIT_INSTALLATION_DIRECTORY)
     blueExp = BlueKit()
+    # Pass original directory to BlueKit
+    blueExp.original_dir = original_dir
     if args.listexploits:
         blueExp.print_available_exploits()
     elif args.checksetup:
@@ -291,7 +313,7 @@ def main():
             elif args.report:
                 blueExp.generate_report(args.target)
             elif args.reportjson:
-                blueExp.generate_machine_readble_report(args.target)
+                blueExp.generate_machine_readable_report(args.target)
             elif args.checkpoint:
                 blueExp.start_from_a_checkpoint(args.target)
             else:
