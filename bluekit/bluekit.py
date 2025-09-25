@@ -24,6 +24,7 @@ from bluekit.checkpoint import Checkpoint
 from bluekit.setupverfication.setupverification import SetupVerifier
 from bluekit.recon import Recon, COMMANDS, load_recon_data
 from bluekit.report import Report
+from bluekit import __version__
 
 
 class BlueKit:
@@ -386,7 +387,7 @@ def main():
         help="Start from a checkpoint",
     )
     parser.add_argument(
-        "-v", "--verbosity", required=False, type=str, help="Verbosity level"
+        "-d", "--debug", required=False, type=str, help="Debug level"
     )
     parser.add_argument(
         "-ex",
@@ -432,6 +433,15 @@ def main():
         type=str,
         help="Scan only for provided exploits based on hardware --hardware hardware1 hardware2; --exclude and --exploit are not taken into account",
     )
+    parser.add_argument(
+        "-v",
+        "--version",
+        required=False,
+        action="store_true",
+        help="Print bluekit version"
+
+    )
+
     parser.add_argument("rest", nargs=argparse.REMAINDER)
     args = parser.parse_args()
 
@@ -485,6 +495,9 @@ def main():
                 blueExp.start_from_a_checkpoint(target)
             else:
                 blueExp.start_from_cli_all(target, addition_parameters)
+    elif args.version:
+        print(__version__)
+
     else:
         parser.print_help()
 
